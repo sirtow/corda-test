@@ -2,13 +2,54 @@ group 'com.accenture.corda'
 version '1.0-SNAPSHOT'
 
 
-buildscript {
 
-    repositories {
-        mavenCentral()
+buildscript {
+    ext {
+        corda_release_group = 'net.corda'
+//        corda_release_version = '4.0-RC03'
+        corda_release_version = '4.0'
+        corda_gradle_plugins_version = '4.0.37'
+        kotlin_version = '1.2.71'  //limited by corda-core
+        kotlin_version_languageVersion = "1.2"
+        kotlin_version_apiVersion = "1.1"
+        junit_version = '4.12'
+        quasar_version = '0.7.10'
+        corda_platform_version = '4'
     }
+
+
     dependencies {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath "net.corda.plugins:cordapp:$corda_gradle_plugins_version"
+        classpath "net.corda.plugins:cordformation:$corda_gradle_plugins_version"
+        classpath "net.corda.plugins:quasar-utils:$corda_gradle_plugins_version"
+    }
+    repositories {
+        mavenLocal()
+        jcenter()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+        maven { url 'https://ci-artifactory.corda.r3cev.com/artifactory/corda-releases' }
+    }
+}
+
+
+allprojects {
+    repositories {
+        mavenLocal()
+        jcenter()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+        maven { url 'https://ci-artifactory.corda.r3cev.com/artifactory/corda-releases' }
+    }
+    buildscript {
+        repositories {
+            mavenLocal()
+            jcenter()
+            mavenCentral()
+            maven { url 'https://jitpack.io' }
+            maven { url 'https://ci-artifactory.corda.r3cev.com/artifactory/corda-releases' }
+        }
     }
 }
 
@@ -22,15 +63,19 @@ cordapp {
     targetPlatformVersion corda_platform_version.toInteger()
     minimumPlatformVersion corda_platform_version.toInteger()
     workflow {
-        name Corda Interfaces test"
-        vendor "Accenture LQS toronto"
+        name "Corda Interfaces test"
+        vendor "Some Company"
+        licence "Apache License, Version 2.0"
+        versionId 1
+    }
+    contract {
+        name "Corda Interfaces test Contract"
+        vendor "Some Company"
         licence "Apache License, Version 2.0"
         versionId 1
     }
 
-    signing {
-        enabled false
-    }
+
 }
 
 
@@ -61,10 +106,59 @@ tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
         javaParameters = true   // Useful for reflection.
     }
 }
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
 
 idea {
     module {
         downloadJavadoc = true
         downloadSources = true
     }
+}
+
+task deployNodesEco1(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
+    nodeDefaults {
+        projectCordapp {
+            deploy = true
+        }
+//        cordapp("$project.group:corda-ser:$project.version")//Needed as SP node need include usermeta update responder flow
+        rpcUsers = [[ user: "user1", "password": "test", "permissions": ["ALL"]]]
+    }
+    directory "./build/nodesEco1"
+    node {
+        name "O=Notary,L=London,C=GB"
+        notary = [validating : false]
+        p2pPort 10001
+        rpcSettings {
+            address("localhost:10002")
+            adminAddress("localhost:10003")
+        }
+    }
+    node {
+        name "O=NODE1,L=London,C=GB"
+        p2pPort 10011
+        rpcSettings {
+            address("localhost:10012")
+            adminAddress("localhost:10013")
+        }
+        h2Port 10014
+    }
+    node {
+        name "O=NODE2,L=Paris,C=FR"
+        p2pPort 10021
+        rpcSettings {
+            address("localhost:10022")
+            adminAddress("localhost:10023")
+        }
+    }
+
+
+}
+task execute(type:JavaExec) {
+    main = (project.hasProperty("mainClass"))?mainClass:''
+    classpath = sourceSets.main.runtimeClasspath
 }
